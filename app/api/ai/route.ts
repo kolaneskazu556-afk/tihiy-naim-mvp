@@ -1,10 +1,24 @@
 import { NextResponse } from "next/server";
+import type OpenAI from "openai";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const SYSTEM =
   "Ты — AI-ассистент по найму для компаний без HR-отдела. Отвечай по-русски, спокойно, конкретно и по делу. Решение о найме принимает человек, ты помогаешь ему.";
+
+const ask = async (client: OpenAI, user: string, json: boolean): Promise<string> => {
+  const res = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.3,
+    ...(json ? { response_format: { type: "json_object" as const } } : {}),
+    messages: [
+      { role: "system", content: SYSTEM },
+      { role: "user", content: user },
+    ],
+  });
+  return res.choices[0]?.message?.content ?? "";
+};
 
 export async function POST(req: Request) {
   try {
@@ -15,21 +29,8 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const action = String(body.action ?? "");
-    const { default: OpenAI } = await import("openai");
-    const client = new OpenAI({ apiKey });
-
-    async function ask(user: string, json: boolean) {
-      const res = await client.chat.completions.create({
-        model: "gpt-4o-mini",
-        temperature: 0.3,
-        ...(json ? { response_format: { type: "json_object" as const } } : {}),
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: user },
-        ],
-      });
-      return res.choices[0]?.message?.content ?? "";
-    }
+    const { default: OpenAIClient } = await import("openai");
+    const client = new OpenAIClient({ apiKey });
 
     if (action === "screen") {
       const { job, criteria, resume } = body;
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Заполните вакансию и резюме" }, { status: 400 });
       }
       const text = await ask(
+        client,
         `Оцени резюме кандидата по вакансии.\n\nВАКАНСИЯ:\n${job}\n\nКРИТЕРИИ:\n${criteria || "не указаны, ориентируйся на описание"}\n\nРЕЗЮМЕ:\n${resume}\n\nВерни ТОЛЬКО JSON: {"score": число 0-100, "reason": "2-4 предложения: что совпало и чего не хватает"}`,
         true,
       );
@@ -52,6 +54,7 @@ export async function POST(req: Request) {
           ? "вежливый, тёплый отказ без шаблонных фраз, с благодарностью за время"
           : "приглашение на интервью, персональное, со ссылкой на конкретный опыт из резюме";
       const text = await ask(
+        client,
         `Напиши сообщение кандидату (email/telegram): ${goal}. Не более 120 слов. Без темы письма, без плейсхолдеров в скобках, подпись «Команда найма».\n\nВАКАНСИЯ:\n${job}\n\nРЕЗЮМЕ:\n${resume}`,
         false,
       );
@@ -64,6 +67,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Введите заметки с интервью" }, { status: 400 });
       }
       const text = await ask(
+        client,
         `По заметкам менеджера составь краткое саммари интервью и рекомендацию.\n\nВАКАНСИЯ:\n${job}\n\nРЕЗЮМЕ:\n${resume}\n\nЗАМЕТКИ С ИНТЕРВЬЮ:\n${notes}\n\nВерни ТОЛЬКО JSON: {"summary": "3-5 предложений: сильные стороны, риски, итог", "recommendation": "HIRE" или "NO_HIRE"}`,
         true,
       );
