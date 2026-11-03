@@ -3,11 +3,26 @@
 @tailwind utilities;
 
 html {
-  background: #0b0d10;
+  background: #07080f;
   color-scheme: dark;
 }
 
 body {
-  background: #0b0d10;
-  color: #e6e8eb;
+  background: #07080f;
+  color: #e6e8f0;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-up {
+  animation: fadeUp 0.45s ease-out both;
 }
