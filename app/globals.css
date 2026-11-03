@@ -2,7 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  background: #0b0d10;
+  color-scheme: dark;
+}
+
 body {
-  background-color: #f8fafc;
-  color: #0f172a;
+  background: #0b0d10;
+  color: #e6e8eb;
 }
