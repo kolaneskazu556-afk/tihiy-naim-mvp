@@ -1,50 +1,32 @@
-import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { NextResponse } from "next/server";
 
-export const dynamic = 'force-dynamic';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
-    const { action, resumeText, jobDescription, notes } = await req.json();
-
-    if (action === 'screen') {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'Ты — AI-рекрутер "Тихий найм". Твоя задача — сравнить резюме с вакансией. Верни строго JSON: {"score": число от 0 до 100, "reason": "краткое обоснование на русском"}.' 
-          },
-          { 
-            role: 'user', 
-            content: `Вакансия: ${jobDescription}\n\nРезюме: ${resumeText}` 
-          }
-        ],
-        response_format: { type: 'json_object' }
-      });
-      return NextResponse.json(JSON.parse(response.choices[0].message.content || '{}'));
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: "Не задан OPENAI_API_KEY" }, { status: 500 });
     }
 
-    if (action === 'summary') {
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'Ты — AI-ассистент. Сделай краткое саммари (3-4 пункта) по заметкам с интервью и дай рекомендацию: Hire или No Hire.' 
-          },
-          { role: 'user', content: notes }
-        ],
-      });
-      return NextResponse.json({ summary: response.choices[0].message.content });
-    }
+    // Библиотеки подключаем ВНУТРИ функции, а не вверху файла
+    const { default: OpenAI } = await import("openai");
+    const client = new OpenAI({ apiKey });
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    const body = await req.json();
+
+    // Если нужен PDF, подключай так:
+    // const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: String(body.prompt ?? "") }],
+    });
+
+    return NextResponse.json({ result: completion.choices[0]?.message?.content ?? "" });
   } catch (error) {
-    return NextResponse.json({ error: 'Ошибка AI' }, { status: 500 });
+    console.error("AI route error", error);
+    return NextResponse.json({ error: "Ошибка AI-запроса" }, { status: 500 });
   }
 }
